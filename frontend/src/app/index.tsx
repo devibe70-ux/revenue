@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRevenueTimeSeries, usePlatformAllocation } from '../hooks/useRevenueData';
 import { MetricCard } from '../components/MetricCard';
 import { RevenueChart } from '../components/RevenueChart';
@@ -15,8 +16,15 @@ export default function Dashboard() {
   const { data: allocation, isLoading: isAllocLoading } = usePlatformAllocation();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#0f172a', '#1e1b4b', '#064e3b']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.title}>Unified Revenue</Text>
@@ -83,6 +91,7 @@ export default function Dashboard() {
         )}
       </View>
     </ScrollView>
+    </View>
   );
 }
 

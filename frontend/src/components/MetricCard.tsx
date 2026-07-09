@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { BlurView } from 'expo-blur';
 
 interface MetricCardProps {
   title: string;
@@ -15,18 +16,24 @@ export function MetricCard({ title, value, trend, isPositive = true }: MetricCar
     <Pressable
       onHoverIn={() => setIsHovered(true)}
       onHoverOut={() => setIsHovered(false)}
-      style={[styles.card, isHovered && styles.cardHovered]}
+      style={[{flex: 1, minWidth: 250, margin: 8}, isHovered && styles.cardHovered]}
     >
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.value}>{value}</Text>
-      {trend && (
-        <View style={styles.trendContainer}>
-          <Text style={[styles.trend, isPositive ? styles.positive : styles.negative]}>
-            {isPositive ? '↑' : '↓'} {trend}
-          </Text>
-          <Text style={styles.trendLabel}>vs last period</Text>
-        </View>
-      )}
+      <BlurView
+        tint="dark"
+        intensity={30}
+        style={styles.card}
+      >
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.value}>{value}</Text>
+        {trend && (
+          <View style={styles.trendContainer}>
+            <Text style={[styles.trend, isPositive ? styles.positive : styles.negative]}>
+              {isPositive ? '↑' : '↓'} {trend}
+            </Text>
+            <Text style={styles.trendLabel}>vs last period</Text>
+          </View>
+        )}
+      </BlurView>
     </Pressable>
   );
 }
@@ -34,16 +41,11 @@ export function MetricCard({ title, value, trend, isPositive = true }: MetricCar
 const styles: any = StyleSheet.create({
   card: {
     flex: 1,
-    minWidth: 250,
     padding: 24,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    margin: 8,
-    // Glassmorphism effect for Web
-    backdropFilter: 'blur(10px)',
-    transition: 'all 0.3s ease',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    overflow: 'hidden',
   },
   cardHovered: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',

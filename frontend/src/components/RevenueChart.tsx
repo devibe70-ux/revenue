@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { BlurView } from 'expo-blur';
 
 export function RevenueChart({ data }: { data: any }) {
   if (!data || !data.timeline || data.timeline.length === 0) return null;
@@ -44,48 +45,52 @@ export function RevenueChart({ data }: { data: any }) {
   const lastDate = formatDate(timeline[timeline.length - 1].date);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Total Net Revenue</Text>
-        <Text style={styles.grandTotal}>
-          ${totalNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </Text>
-      </View>
+    <View style={styles.containerWrapper}>
+      <BlurView tint="dark" intensity={40} style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Total Net Revenue</Text>
+          <Text style={styles.grandTotal}>
+            ${totalNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </Text>
+        </View>
 
-      <View style={styles.chartContainer}>
-        <Svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-          <Defs>
-            <LinearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <Stop offset="0%" stopColor={strokeColor} stopOpacity="0.4" />
-              <Stop offset="100%" stopColor={strokeColor} stopOpacity="0.0" />
-            </LinearGradient>
-          </Defs>
-          {/* The Glowing Area Fill */}
-          <Path d={areaPath} fill="url(#gradient)" />
-          {/* The Smooth Main Line */}
-          <Path d={linePath} fill="none" stroke={strokeColor} strokeWidth="3" strokeLinejoin="round" />
-        </Svg>
-      </View>
-      
-      <View style={styles.xAxis}>
-        <Text style={styles.axisLabel}>{firstDate}</Text>
-        <Text style={styles.axisLabel}>{midDate}</Text>
-        <Text style={styles.axisLabel}>{lastDate}</Text>
-      </View>
+        <View style={styles.chartContainer}>
+          <Svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+            <Defs>
+              <LinearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <Stop offset="0%" stopColor={strokeColor} stopOpacity="0.4" />
+                <Stop offset="100%" stopColor={strokeColor} stopOpacity="0.0" />
+              </LinearGradient>
+            </Defs>
+            {/* The Glowing Area Fill */}
+            <Path d={areaPath} fill="url(#gradient)" />
+            {/* The Smooth Main Line */}
+            <Path d={linePath} fill="none" stroke={strokeColor} strokeWidth="3" strokeLinejoin="round" />
+          </Svg>
+        </View>
+        
+        <View style={styles.xAxis}>
+          <Text style={styles.axisLabel}>{firstDate}</Text>
+          <Text style={styles.axisLabel}>{midDate}</Text>
+          <Text style={styles.axisLabel}>{lastDate}</Text>
+        </View>
+      </BlurView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  containerWrapper: {
+    margin: 8,
+    borderRadius: 16,
+    overflow: 'hidden',
+    flexShrink: 1,
+  },
   container: {
     padding: 24,
-    borderRadius: 16,
-    backgroundColor: 'rgba(25, 27, 31, 0.8)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    margin: 8,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     height: 440,
-    overflow: 'hidden',
     flexShrink: 1,
   },
   header: {
