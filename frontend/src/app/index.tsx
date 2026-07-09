@@ -6,21 +6,65 @@ import { MetricCard } from '../components/MetricCard';
 import { RevenueChart } from '../components/RevenueChart';
 import { DateRangeSelector, DateRange } from '../components/DateRangeSelector';
 import { RevenueBreakdownTable } from '../components/RevenueBreakdownTable';
+import { SubscriptionGate } from '../components/SubscriptionGate';
 import { useAuth } from '../context/AuthContext';
 import { router } from 'expo-router';
 import { auth } from '../lib/firebase';
 
 // Safely import AdMob manager
-import { BannerAd, BannerAdSize, AdsConsent } from '../lib/AdMobManager';
+import { BannerAd, BannerAdSize, AdsConsent, InterstitialAd, AdEventType } from '../lib/AdMobManager';
+
+// Use a test ID for Interstitial Ads until a real one is provided
+const interstitialId = 'ca-app-pub-3940256099942544/1033173712';
 
 export default function Dashboard() {
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, profile, isLoading: isAuthLoading } = useAuth();
   
+  // Timer for showing ads to free users
+  useEffect(() => {
+    if (Platform.OS === 'web' || profile?.subscriptionTier !== 'free' || !InterstitialAd) return;
+
+    let interstitial: any = null;
+
+    const loadAndShowAd = () => {
+      interstitial = InterstitialAd.createForAdRequest(interstitialId, {
+        requestNonPersonalizedAdsOnly: false,
+      });
+
+      const unsubscribeLoaded = interstitial.addAdEventListener(AdEventType.LOADED, () => {
+        interstitial.show();
+      });
+
+      const unsubscribeClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
+        // Clean up when closed
+      });
+
+      interstitial.load();
+
+      return () => {
+        unsubscribeLoaded();
+        unsubscribeClosed();
+      };
+    };
+
+    // Show an ad every 12 minutes (between 10 and 15 mins)
+    const AD_INTERVAL_MS = 12 * 60 * 1000;
+    const intervalId = setInterval(() => {
+      loadAndShowAd();
+    }, AD_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [profile?.subscriptionTier]);
+
   useEffect(() => {
     if (!isAuthLoading && !user) {
       router.replace('/login');
+    } else if (!isAuthLoading && user && profile) {
+      if (profile.subscriptionTier === 'pro' && profile.mfaEnabled === false) {
+        router.replace('/two-factor-setup');
+      }
     }
-  }, [user, isAuthLoading]);
+  }, [user, profile, isAuthLoading]);
 
   const [dateRange, setDateRange] = useState<DateRange>('1M');
   // Pass the user ID to fetch actual real data from Firestore
@@ -63,6 +107,12 @@ export default function Dashboard() {
             </TouchableOpacity>
           )}
           <TouchableOpacity 
+            style={[styles.upgradeButton, { marginLeft: 8 }]}
+            onPress={() => router.push('/pricing')}
+          >
+            <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
             style={[styles.privacyButton, { marginLeft: 8 }]}
             onPress={() => auth.signOut()}
           >
@@ -102,7 +152,9 @@ export default function Dashboard() {
           </View>
 
           <View style={styles.chartsColumn}>
-            <DateRangeSelector selectedRange={dateRange} onSelectRange={setDateRange} />
+            <SubscriptionGate>
+              <DateRangeSelector selectedRange={dateRange} onSelectRange={setDateRange} />
+            </SubscriptionGate>
             
             {isSeriesLoading ? (
               <View style={styles.loadingContainer}>
@@ -113,7 +165,9 @@ export default function Dashboard() {
                 <View style={styles.mainChart}>
                    <RevenueChart data={timeSeries} />
                 </View>
-                <RevenueBreakdownTable data={timeSeries} />
+                <SubscriptionGate>
+                  <RevenueBreakdownTable data={timeSeries} />
+                </SubscriptionGate>
             
             {Platform.OS !== 'web' && BannerAd && (
               <View style={styles.adContainer}>
@@ -181,12 +235,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 8,
-    marginTop: 12,
   },
   privacyButtonText: {
-    color: '#A0AEC0',
-    fontSize: 12,
+    color: '#8A8F98',
+    fontSize: 14,
     fontWeight: '600',
+  },
+  upgradeButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(96, 165, 250, 0.2)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.5)',
+  },
+  upgradeButtonText: {
+    color: '#60A5FA',
+    fontSize: 14,
+    fontWeight: '700',
   },
   metricsRow: {
     flexDirection: 'row',

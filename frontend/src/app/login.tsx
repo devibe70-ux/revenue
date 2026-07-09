@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator 
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { auth } from '../lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, TotpMultiFactorGenerator, MultiFactorResolver, getMultiFactorResolver } from 'firebase/auth';
 import { router } from 'expo-router';
 
 export default function Login() {
@@ -12,6 +12,8 @@ export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
 
   const handleAuth = async () => {
     if (!email || !password) {
@@ -31,7 +33,32 @@ export default function Login() {
       // Successful login/signup will trigger AuthContext and index.tsx logic
       router.replace('/');
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+      if (err.code === 'auth/multi-factor-auth-required') {
+        const resolver = getMultiFactorResolver(auth, err);
+        setMfaResolver(resolver);
+      } else {
+        setError(err.message || 'Authentication failed');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMfaSubmit = async () => {
+    if (!mfaResolver || mfaCode.length !== 6) return;
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const assertion = TotpMultiFactorGenerator.assertionForSignIn(
+        mfaResolver.hints[0].uid,
+        mfaCode
+      );
+      await mfaResolver.resolveSignIn(assertion);
+      router.replace('/');
+    } catch (err: any) {
+      console.error(err);
+      setError("Invalid 2FA code. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -49,54 +76,111 @@ export default function Login() {
       <View style={styles.content}>
         <BlurView tint="dark" intensity={40} style={styles.card}>
           <Text style={styles.title}>Unified Revenue</Text>
-          <Text style={styles.subtitle}>Sign in to view your dashboard</Text>
+          <Text style={styles.subtitle}>
+            {mfaResolver ? "Enter your 2FA Authenticator code" : "Sign in to view your dashboard"}
+          </Text>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email Address"
-            placeholderTextColor="#8A8F98"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+          {mfaResolver ? (
+            <>
+              <TextInput
+                style={[styles.input, { textAlign: 'center', fontSize: 24, letterSpacing: 8 }]}
+                placeholder="000000"
+                placeholderTextColor="#8A8F98"
+                value={mfaCode}
+                onChangeText={setMfaCode}
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+              <TouchableOpacity 
+                style={styles.primaryButton}
+                onPress={handleMfaSubmit}
+                disabled={isLoading || mfaCode.length !== 6}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Verify Code</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.secondaryButton}
+                onPress={() => {
+                  setMfaResolver(null);
+                  setMfaCode('');
+                  setError('');
+                }}
+              >
+                <Text style={styles.secondaryButtonText}>Back to login</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Email Address"
+                placeholderTextColor="#8A8F98"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#8A8F98"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                placeholderTextColor="#8A8F98"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
 
-          <TouchableOpacity 
-            style={styles.primaryButton}
-            onPress={handleAuth}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryButtonText}>
-                {isLogin ? 'Sign In' : 'Create Account'}
-              </Text>
-            )}
-          </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.primaryButton}
+                onPress={handleAuth}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>
+                    {isLogin ? 'Sign In with Email' : 'Create Account'}
+                  </Text>
+                )}
+              </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.secondaryButton}
-            onPress={() => {
-              setIsLogin(!isLogin);
-              setError('');
-            }}
-          >
-            <Text style={styles.secondaryButtonText}>
-              {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
-            </Text>
-          </TouchableOpacity>
+              <View style={styles.dividerContainer}>
+                <View style={styles.divider} />
+                <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
+                <View style={styles.divider} />
+              </View>
+
+              <View style={styles.ssoContainer}>
+                <TouchableOpacity style={styles.ssoButton}>
+                  <Text style={styles.ssoButtonText}>Google</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.ssoButton}>
+                  <Text style={styles.ssoButtonText}>Apple</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.ssoButton}>
+                  <Text style={styles.ssoButtonText}>Microsoft</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity 
+                style={styles.secondaryButton}
+                onPress={() => {
+                  setIsLogin(!isLogin);
+                  setError('');
+                }}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
         </BlurView>
       </View>
     </View>
@@ -157,6 +241,42 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  dividerText: {
+    color: '#8A8F98',
+    marginHorizontal: 16,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  ssoContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  ssoButton: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  ssoButtonText: {
+    color: '#E2E8F0',
+    fontSize: 14,
+    fontWeight: '600',
   },
   secondaryButton: {
     marginTop: 24,
