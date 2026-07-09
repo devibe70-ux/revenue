@@ -17,7 +17,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.frontend"
     },
     "web": {
       "output": "static",
@@ -34,11 +35,19 @@
             "imageWidth": 76
           }
         }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-7107715238624071~7255569830",
+          "userTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": true,
+      "baseUrl": "/revenue"
     }
   }
 }

@@ -1,8 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import { PrismaClient } from '@prisma/client';
+import { db } from '../lib/firebaseAdmin';
 import { encryptToken } from '../services/crypto';
-
-const prisma = new PrismaClient();
 
 export default async function authRoutes(fastify: FastifyInstance) {
     
@@ -31,31 +29,24 @@ export default async function authRoutes(fastify: FastifyInstance) {
         const encryptedAccess = encryptToken(mockAccessToken);
         const encryptedRefresh = encryptToken(mockRefreshToken);
 
-        // For this demo, let's assume a static user id or create a mock user
-        let user = await prisma.user.findFirst();
-        if (!user) {
-            user = await prisma.user.create({
-                data: {
-                    email: `demo_${Date.now()}@revenudashboard.local`
-                }
-            });
-        }
+        // For this demo, let's assume a static user id
+        const demoUserId = 'demo_user_123';
 
-        // 3. Upsert Integration
-        const integration = await prisma.platformIntegration.create({
-            data: {
-                userId: user.id,
-                platformName: platform,
-                encryptedAccessToken: encryptedAccess,
-                encryptedRefreshToken: encryptedRefresh,
-                tokenExpiresAt: expiresAt,
-                status: 'active'
-            }
+        // 3. Upsert Integration into Firebase
+        const integrationRef = db.collection('integrations').doc(`${demoUserId}_${platform}`);
+        await integrationRef.set({
+            userId: demoUserId,
+            platformName: platform,
+            encryptedAccessToken: encryptedAccess,
+            encryptedRefreshToken: encryptedRefresh,
+            tokenExpiresAt: expiresAt,
+            status: 'active',
+            updatedAt: new Date()
         });
 
         return reply.send({
             message: `Successfully connected ${platform}`,
-            integrationId: integration.id
+            integrationId: integrationRef.id
         });
     });
 }
