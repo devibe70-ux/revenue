@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRevenueTimeSeries, usePlatformAllocation } from '../hooks/useRevenueData';
@@ -6,14 +6,38 @@ import { MetricCard } from '../components/MetricCard';
 import { RevenueChart } from '../components/RevenueChart';
 import { DateRangeSelector, DateRange } from '../components/DateRangeSelector';
 import { RevenueBreakdownTable } from '../components/RevenueBreakdownTable';
+import { useAuth } from '../context/AuthContext';
+import { router } from 'expo-router';
+import { auth } from '../lib/firebase';
 
 // Safely import AdMob manager
 import { BannerAd, BannerAdSize, AdsConsent } from '../lib/AdMobManager';
 
 export default function Dashboard() {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      router.replace('/login');
+    }
+  }, [user, isAuthLoading]);
+
   const [dateRange, setDateRange] = useState<DateRange>('1M');
-  const { data: timeSeries, isLoading: isSeriesLoading } = useRevenueTimeSeries(dateRange);
-  const { data: allocation, isLoading: isAllocLoading } = usePlatformAllocation();
+  // Pass the user ID to fetch actual real data from Firestore
+  const { data: timeSeries, isLoading: isSeriesLoading } = useRevenueTimeSeries(dateRange, user?.uid);
+  const { data: allocation, isLoading: isAllocLoading } = usePlatformAllocation(user?.uid);
+
+  if (isAuthLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#60A5FA" />
+      </View>
+    );
+  }
+
+  if (!user) return null;
+
+  const hasData = timeSeries && timeSeries.timeline && timeSeries.timeline.length > 0;
 
   return (
     <View style={styles.container}>
@@ -35,46 +59,61 @@ export default function Dashboard() {
               style={styles.privacyButton}
               onPress={() => AdsConsent.showPrivacyOptionsForm()}
             >
-              <Text style={styles.privacyButtonText}>Privacy Options (CCPA/CPRA)</Text>
+              <Text style={styles.privacyButtonText}>Privacy Options</Text>
             </TouchableOpacity>
           )}
+          <TouchableOpacity 
+            style={[styles.privacyButton, { marginLeft: 8 }]}
+            onPress={() => auth.signOut()}
+          >
+            <Text style={styles.privacyButtonText}>Sign Out</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.metricsRow}>
-        <MetricCard 
-          title="Total Net Revenue" 
-          value={`$${allocation?.total_combined_net?.toLocaleString() || '0'}`} 
-          trend="12.5%" 
-          isPositive={true} 
-        />
-        <MetricCard 
-          title="Amazon Direct Sales" 
-          value={`$${allocation?.distribution?.find((d: any) => d.platform === 'amazon')?.net_amount?.toLocaleString() || '0'}`} 
-          trend="4.2%" 
-          isPositive={true} 
-        />
-        <MetricCard 
-          title="YouTube Ad Revenue" 
-          value={`$${allocation?.distribution?.find((d: any) => d.platform === 'youtube')?.net_amount?.toLocaleString() || '0'}`} 
-          trend="1.8%" 
-          isPositive={false} 
-        />
-      </View>
-
-      <View style={styles.chartsColumn}>
-        <DateRangeSelector selectedRange={dateRange} onSelectRange={setDateRange} />
-        
-        {isSeriesLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#60A5FA" />
+      {!hasData && !isSeriesLoading && !isAllocLoading ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateTitle}>No Revenue Data Yet</Text>
+          <Text style={styles.emptyStateText}>
+            Connect your Amazon or YouTube accounts in the backend to start seeing real data here!
+          </Text>
+        </View>
+      ) : (
+        <>
+          <View style={styles.metricsRow}>
+            <MetricCard 
+              title="Total Net Revenue" 
+              value={`$${allocation?.total_combined_net?.toLocaleString() || '0'}`} 
+              trend="12.5%" 
+              isPositive={true} 
+            />
+            <MetricCard 
+              title="Amazon Direct Sales" 
+              value={`$${allocation?.distribution?.find((d: any) => d.platform === 'amazon')?.net_amount?.toLocaleString() || '0'}`} 
+              trend="4.2%" 
+              isPositive={true} 
+            />
+            <MetricCard 
+              title="YouTube Ad Revenue" 
+              value={`$${allocation?.distribution?.find((d: any) => d.platform === 'youtube')?.net_amount?.toLocaleString() || '0'}`} 
+              trend="1.8%" 
+              isPositive={false} 
+            />
           </View>
-        ) : (
-          <>
-            <View style={styles.mainChart}>
-               <RevenueChart data={timeSeries} />
-            </View>
-            <RevenueBreakdownTable data={timeSeries} />
+
+          <View style={styles.chartsColumn}>
+            <DateRangeSelector selectedRange={dateRange} onSelectRange={setDateRange} />
+            
+            {isSeriesLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#60A5FA" />
+              </View>
+            ) : (
+              <>
+                <View style={styles.mainChart}>
+                   <RevenueChart data={timeSeries} />
+                </View>
+                <RevenueBreakdownTable data={timeSeries} />
             
             {Platform.OS !== 'web' && BannerAd && (
               <View style={styles.adContainer}>
@@ -90,6 +129,8 @@ export default function Dashboard() {
           </>
         )}
       </View>
+        </>
+      )}
     </ScrollView>
     </View>
   );
@@ -164,5 +205,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
     width: '100%',
+  },
+  emptyState: {
+    padding: 60,
+    backgroundColor: 'rgba(25, 27, 31, 0.5)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 40,
+  },
+  emptyStateTitle: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  emptyStateText: {
+    color: '#8A8F98',
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
   }
 });

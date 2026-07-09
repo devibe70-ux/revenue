@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 
 // Safely import AdMob manager
 import { mobileAds, AdsConsent } from '../lib/AdMobManager';
+import { AuthProvider } from '../context/AuthContext';
 
 const queryClient = new QueryClient();
 
@@ -24,8 +25,10 @@ export default function Layout() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0B0D10' } }} />
-    </QueryClientProvider>
+    <AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0B0D10' } }} />
+      </QueryClientProvider>
+    </AuthProvider>
   );
 }

@@ -13,8 +13,11 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID
 };
 
-// Initialize Firebase only once
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+// Initialize Firebase only once, and gracefully handle missing keys during SSG build
+const app = getApps().length === 0 && firebaseConfig.apiKey 
+  ? initializeApp(firebaseConfig) 
+  : getApps().length > 0 ? getApps()[0] : null;
 
-export const db = getFirestore(app);
-export const auth = getAuth(app);
+// Only initialize services if app was successfully created
+export const db = app ? getFirestore(app) : null as any;
+export const auth = app ? getAuth(app) : null as any;
